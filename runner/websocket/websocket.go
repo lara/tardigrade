@@ -21,22 +21,16 @@ var upgrader = websocket.Upgrader{
 }
 
 func Start(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return
-	}
-
 	// Read messages from socket
-	go run(ctx, conn, cli)
+	go run(conn)
 }
 
-func run(ctx context.Context, conn *websocket.Conn, cli *client.Client) {
+func run(conn *websocket.Conn) {
 	for {
 		msgType, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -44,55 +38,70 @@ func run(ctx context.Context, conn *websocket.Conn, cli *client.Client) {
 			return
 		}
 
-		if string(msg) == "alpine" {
-			containerConfig := &container.Config{
-				Image:       string(msg),
-				Cmd:         []string{"sh && sleep 1"},
-				AttachStdin: true,
-			}
-
-			_, err := cli.ImagePull(ctx, string(msg), types.ImagePullOptions{})
-			if err != nil {
-				panic(err)
-			}
-
-			response, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
-			if err != nil {
-				panic(err)
-			}
-
-			cli.ContainerStart(ctx, response.ID, types.ContainerStartOptions{})
-
-			containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
-			if err != nil {
-				panic(err)
-			}
-
-			id, err := cli.ContainerExecCreate(ctx, response.ID, types.ExecConfig{Cmd: []string{"sh"}, AttachStdout: true})
-			// attachResponse, _ := cli.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
-
-			// attachResponse.Conn.Write([]byte("echo 'hello world'"))
-			// attachResponse.Reader.WriteTo(os.Stdout)
-
-			cli.ContainerExecStart(ctx, id.ID, types.ExecStartCheck{Detach: false})
-
-			out, err := cli.ContainerLogs(ctx, response.ID, types.ContainerLogsOptions{ShowStdout: true})
-			if err != nil {
-				panic(err)
-			}
-
-			io.Copy(os.Stdout, out)
-
-			for _, container := range containers {
+		switch string(msg) {
+		case
+			"alpine",
+			"ubuntu":
+			for _, container := range runContainer(string(msg)) {
 				conn.WriteMessage(msgType, []byte(container.ID))
 			}
-		} else {
+		default:
 			// Print the message to the console
 			fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
 			if err = conn.WriteMessage(msgType, msg); err != nil {
 				return
 			}
 		}
+
 		log.Printf("msg: %s", string(msg))
 	}
+}
+
+func runContainer(msg string) []types.Container {
+	ctx := context.Background()
+
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		panic(err)
+	}
+
+	containerConfig := &container.Config{
+		Image:       string(msg),
+		Cmd:         []string{"sh && sleep 1"},
+		AttachStdin: true,
+	}
+
+	_, err = cli.ImagePull(ctx, string(msg), types.ImagePullOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	response, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
+	if err != nil {
+		panic(err)
+	}
+
+	cli.ContainerStart(ctx, response.ID, types.ContainerStartOptions{})
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	id, err := cli.ContainerExecCreate(ctx, response.ID, types.ExecConfig{Cmd: []string{"sh"}, AttachStdout: true})
+	// attachResponse, _ := cli.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
+
+	// attachResponse.Conn.Write([]byte("echo 'hello world'"))
+	// attachResponse.Reader.WriteTo(os.Stdout)
+
+	cli.ContainerExecStart(ctx, id.ID, types.ExecStartCheck{Detach: false})
+
+	out, err := cli.ContainerLogs(ctx, response.ID, types.ContainerLogsOptions{ShowStdout: true})
+	if err != nil {
+		panic(err)
+	}
+
+	io.Copy(os.Stdout, out)
+
+	return containers
 }
