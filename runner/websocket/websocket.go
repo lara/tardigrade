@@ -21,18 +21,22 @@ var upgrader = websocket.Upgrader{
 }
 
 func Start(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 
-	ctx := context.Background()
-	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	// Read messages from socket
+	go run(ctx, conn, cli)
+}
+
+func run(ctx context.Context, conn *websocket.Conn, cli *client.Client) {
 	for {
 		msgType, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -47,34 +51,34 @@ func Start(w http.ResponseWriter, r *http.Request) {
 				AttachStdin: true,
 			}
 
-			_, err := dockerClient.ImagePull(ctx, string(msg), types.ImagePullOptions{})
+			_, err := cli.ImagePull(ctx, string(msg), types.ImagePullOptions{})
 			if err != nil {
 				panic(err)
 			}
 
-			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
+			response, err := cli.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
 			if err != nil {
 				panic(err)
 			}
 
-			dockerClient.ContainerStart(ctx, response.ID, types.ContainerStartOptions{})
+			cli.ContainerStart(ctx, response.ID, types.ContainerStartOptions{})
 
-			containers, err := dockerClient.ContainerList(ctx, types.ContainerListOptions{})
+			containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
 			if err != nil {
 				panic(err)
 			}
 
-			id, err := dockerClient.ContainerExecCreate(ctx, response.ID, types.ExecConfig{Cmd: []string{"sh"}, AttachStdout: true})
-			// attachResponse, _ := dockerClient.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
+			id, err := cli.ContainerExecCreate(ctx, response.ID, types.ExecConfig{Cmd: []string{"sh"}, AttachStdout: true})
+			// attachResponse, _ := cli.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
 
 			// attachResponse.Conn.Write([]byte("echo 'hello world'"))
 			// attachResponse.Reader.WriteTo(os.Stdout)
 
-			dockerClient.ContainerExecStart(ctx, id.ID, types.ExecStartCheck{Detach: false})
+			cli.ContainerExecStart(ctx, id.ID, types.ExecStartCheck{Detach: false})
 
-			out, err6 := dockerClient.ContainerLogs(ctx, response.ID, types.ContainerLogsOptions{ShowStdout: true})
-			if err6 != nil {
-				panic(err6)
+			out, err := cli.ContainerLogs(ctx, response.ID, types.ContainerLogsOptions{ShowStdout: true})
+			if err != nil {
+				panic(err)
 			}
 
 			io.Copy(os.Stdout, out)
