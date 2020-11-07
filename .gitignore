@@ -1,0 +1,21 @@
+###Go###
+
+# Compiled object files, static and dynamic libs
+*.o
+*.a
+*.so
+
+# Folders
+_obj
+_test
+
+
+###OSX###
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
