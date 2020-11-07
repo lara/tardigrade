@@ -43,7 +43,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 		if string(msg) == "alpine" {
 			containerConfig := &container.Config{
 				Image:       string(msg),
-				Cmd:         []string{"sh"},
+				Cmd:         []string{"sh && sleep 1000"},
 				AttachStdin: true,
 			}
 
@@ -52,7 +52,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 				panic(err)
 			}
 
-			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, "")
+			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
 			if err != nil {
 				panic(err)
 			}
@@ -65,10 +65,10 @@ func ws(w http.ResponseWriter, r *http.Request) {
 			}
 
 			id, err := dockerClient.ContainerExecCreate(ctx, response.ID, types.ExecConfig{Cmd: []string{"sh"}, AttachStdout: true})
-			attachResponse, _ := dockerClient.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
+			// attachResponse, _ := dockerClient.ContainerExecAttach(ctx, id.ID, types.ExecStartCheck{Detach: false})
 
-			attachResponse.Conn.Write([]byte("echo 'hello world'"))
-			attachResponse.Reader.WriteTo(os.Stdout)
+			// attachResponse.Conn.Write([]byte("echo 'hello world'"))
+			// attachResponse.Reader.WriteTo(os.Stdout)
 
 			dockerClient.ContainerExecStart(ctx, id.ID, types.ExecStartCheck{Detach: false})
 
