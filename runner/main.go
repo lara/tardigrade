@@ -52,7 +52,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 				panic(err)
 			}
 
-			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, "")
+			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
 			if err != nil {
 				panic(err)
 			}
