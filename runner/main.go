@@ -27,7 +27,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	dockerClient, err := client.NewClientWithOpts(client.WithVersion("1.39"))
+	dockerClient, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 		if string(msg) == "alpine" {
 			containerConfig := &container.Config{
 				Image:       string(msg),
-				Cmd:         []string{"sh && sleep 1000"},
+				Cmd:         []string{"sh && sleep 1"},
 				AttachStdin: true,
 			}
 
@@ -52,7 +52,7 @@ func ws(w http.ResponseWriter, r *http.Request) {
 				panic(err)
 			}
 
-			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, nil, "")
+			response, err := dockerClient.ContainerCreate(ctx, containerConfig, nil, nil, "")
 			if err != nil {
 				panic(err)
 			}
