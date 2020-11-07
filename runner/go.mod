@@ -1,4 +1,4 @@
-module github.com/lara/tardigrade/runner
+module runner
 
 go 1.15
 
